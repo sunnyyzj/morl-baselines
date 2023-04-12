@@ -1,20 +1,13 @@
 """MORL algorithm base classes."""
-import time
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import gymnasium as gym
 import numpy as np
 import torch as th
-import wandb
 from gymnasium import spaces
-from mo_gymnasium.utils import MOSyncVectorEnv
+from mo_gymnasium import eval_mo, eval_mo_reward_conditioned
 from torch.utils.tensorboard import SummaryWriter
-
-from morl_baselines.common.evaluation import (
-    eval_mo_reward_conditioned,
-    policy_evaluation_mo,
-)
 
 
 class MOPolicy(ABC):
@@ -82,40 +75,38 @@ class MOPolicy(ABC):
     def policy_eval(
         self,
         eval_env,
-        num_episodes: int = 5,
         scalarization=np.dot,
         weights: Optional[np.ndarray] = None,
         writer: Optional[SummaryWriter] = None,
     ):
-        """Runs a policy evaluation (typically over a few episodes) on eval_env and logs some metrics using writer.
+        """Runs a policy evaluation (typically on one episode) on eval_env and logs some metrics using writer.
 
         Args:
             eval_env: evaluation environment
-            num_episodes: number of episodes to evaluate
             scalarization: scalarization function
             weights: weights to use in the evaluation
             writer: wandb writer
 
         Returns:
-             a tuple containing the average evaluations
+             a tuple containing the evaluations
         """
         (
-            scalarized_return,
-            scalarized_discounted_return,
-            vec_return,
-            discounted_vec_return,
-        ) = policy_evaluation_mo(self, eval_env, w=weights, rep=num_episodes)
+            scalarized_reward,
+            scalarized_discounted_reward,
+            vec_reward,
+            discounted_vec_reward,
+        ) = eval_mo(self, eval_env, scalarization=scalarization, w=weights)
 
         if writer is not None:
             self.__report(
-                scalarized_return,
-                scalarized_discounted_return,
-                vec_return,
-                discounted_vec_return,
+                scalarized_reward,
+                scalarized_discounted_reward,
+                vec_reward,
+                discounted_vec_reward,
                 writer,
             )
 
-        return scalarized_return, scalarized_discounted_return, vec_return, discounted_vec_return
+        return scalarized_reward, scalarized_discounted_reward, vec_reward, discounted_vec_reward
 
     def policy_eval_esr(
         self,
@@ -161,21 +152,18 @@ class MOPolicy(ABC):
 class MOAgent(ABC):
     """An MORL Agent, can contain one or multiple MOPolicies. Contains helpers to extract features from the environment, setup logging etc."""
 
-    def __init__(self, env: Optional[gym.Env], device: Union[th.device, str] = "auto", seed: Optional[int] = None) -> None:
+    def __init__(self, env: Optional[gym.Env], device: Union[th.device, str] = "auto") -> None:
         """Initializes the agent.
 
         Args:
             env: (gym.Env): The environment
             device: (str): The device to use for training. Can be "auto", "cpu" or "cuda".
-            seed: (int): The seed to use for the random number generator
         """
         self.extract_env_info(env)
         self.device = th.device("cuda" if th.cuda.is_available() else "cpu") if device == "auto" else device
 
         self.global_step = 0
         self.num_episodes = 0
-        self.seed = seed
-        self.np_random = np.random.default_rng(self.seed)
 
     def extract_env_info(self, env: Optional[gym.Env]) -> None:
         """Extracts all the features of the environment: observation space, action space, ...
@@ -211,41 +199,25 @@ class MOAgent(ABC):
             dict: Config
         """
 
-    def register_additional_config(self, conf: Dict = {}) -> None:
-        """Registers additional config parameters to wandb. For example when calling train().
-
-        Args:
-            conf: dictionary of additional config parameters
-        """
-        for key, value in conf.items():
-            wandb.config[key] = value
-
-    def setup_wandb(self, project_name: str, experiment_name: str, entity: Optional[str] = None) -> None:
+    def setup_wandb(self, project_name: str, experiment_name: str) -> None:
         """Initializes the wandb writer.
 
         Args:
             project_name: name of the wandb project. Usually MORL-Baselines.
             experiment_name: name of the wandb experiment. Usually the algorithm name.
-            entity: wandb entity. Usually your username but useful for reporting other places such as openrlbenmark.
 
         Returns:
             None
         """
         self.experiment_name = experiment_name
-        env_id = self.env.spec.id if not isinstance(self.env, MOSyncVectorEnv) else self.env.envs[0].spec.id
-        self.full_experiment_name = f"{env_id}__{experiment_name}__{self.seed}__{int(time.time())}"
         import wandb
-
-        config = self.get_config()
-        config["algo"] = self.experiment_name
 
         wandb.init(
             project=project_name,
-            entity=entity,
             sync_tensorboard=True,
-            config=config,
-            name=self.full_experiment_name,
-            monitor_gym=True,
+            config=self.get_config(),
+            name=self.experiment_name,
+            monitor_gym=False,
             save_code=True,
         )
         self.writer = SummaryWriter(f"/tmp/{self.experiment_name}")

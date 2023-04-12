@@ -23,13 +23,6 @@ lastpage:
 :end-before: <!-- end features -->
 ```
 
-## Benchmarks
-
-```{include} ../README.md
-:start-after: <!-- start benchmark -->
-:end-before: <!-- end benchmark -->
-```
-
 ## Citing MORL-Baselines
 ```{include} ../README.md
 :start-after: <!-- start citing -->
@@ -50,7 +43,6 @@ quickstart/overview
 algos/algorithms
 algos/multi_policy
 algos/single_policy
-algos/performances
 ```
 
 ```{toctree}
@@ -58,7 +50,6 @@ algos/performances
 :caption: Features
 
 features/pareto
-features/evaluations
 features/performance_indicators
 features/scalarization
 features/buffers

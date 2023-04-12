@@ -118,17 +118,14 @@ def make_env(env_id, seed, idx, run_name, gamma):
     """
 
     def thunk():
-        if idx == 0:
-            env = mo_gym.make(env_id, render_mode="rgb_array")
-        else:
-            env = mo_gym.make(env_id)
+        env = mo_gym.make(env_id)
         reward_dim = env.reward_space.shape[0]
-        """ if idx == 0:
+        if idx == 0:
             env = gym.wrappers.RecordVideo(
                 env,
                 f"videos/{run_name}_{seed}",
                 episode_trigger=lambda e: e % 1000 == 0,
-            ) """
+            )
         env = gym.wrappers.ClipAction(env)
         env = gym.wrappers.NormalizeObservation(env)
         env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
@@ -264,7 +261,6 @@ class MOPPO(MOPolicy):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         seed: int = 42,
-        rng: Optional[np.random.Generator] = None,
     ):
         """Multi-objective PPO.
 
@@ -291,7 +287,6 @@ class MOPPO(MOPolicy):
             gae_lambda: GAE lambda
             device: Device to use
             seed: Random seed
-            rng: Random number generator
         """
         super().__init__(id, device)
         self.id = id
@@ -300,14 +295,9 @@ class MOPPO(MOPolicy):
         self.networks = networks
         self.device = device
         self.seed = seed
-        if rng is not None:
-            self.np_random = rng
-        else:
-            self.np_random = np.random.default_rng(self.seed)
 
         # PPO Parameters
         self.steps_per_iteration = steps_per_iteration
-        self.np_weights = weights
         self.weights = th.from_numpy(weights).to(self.device)
         self.batch_size = int(self.num_envs * self.steps_per_iteration)
         self.num_minibatches = num_minibatches
@@ -502,7 +492,7 @@ class MOPPO(MOPolicy):
         clipfracs = []
         # Perform multiple passes on the batch (that is shuffled every time)
         for epoch in range(self.update_epochs):
-            self.np_random.shuffle(b_inds)
+            np.random.shuffle(b_inds)
             for start in range(0, self.batch_size, self.minibatch_size):
                 end = start + self.minibatch_size
                 # mb == minibatch

@@ -10,7 +10,11 @@
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
 # MORL-Baselines
-
+## How to
+1. change directory to `highway-env-1.7` and execute `pip install .` or ` D:/Users/yanzi/miniconda3/python.exe -m pip install .`
+2. change directory to `MO-Gymnasium` and execute `pip install .` or ` D:/Users/yanzi/miniconda3/python.exe -m pip install .`
+3. change directory to `morl-baselines` and execute `pip install .` or ` D:/Users/yanzi/miniconda3/python.exe -m pip install .`
+4. change directory to `morl-baselines\examples` run `D:/Users/yanzi/miniconda3/python.exe envelope_highway_bs.py`
 <!-- start elevator-pitch -->
 
 MORL-Baselines is a library of Multi-Objective Reinforcement Learning (MORL) algorithms.
@@ -43,33 +47,18 @@ For details on multi-objective MDP's (MOMDP's) and other MORL definitions, we su
 
 <!-- start algos-list -->
 
-| **Name**                                                                                                                                                                 | Single/Multi-policy | ESR/SER | Observation space | Action space | Paper                                                                                                                       |
+| Algo                                                                                                                                                                 | Single/Multi-policy | ESR/SER | Observation space | Action space | Paper                                                                                                                       |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------|------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------|
-| [GPI-LS + GPI-PD](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/gpi_pd/gpi_pd.py)                                      | Multi               | SER     | Continuous       | Discrete / Continuous     | [Paper and Supplementary Materials](https://arxiv.org/abs/2301.07784)
 | [Envelope Q-Learning](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/envelope/envelope.py)                                      | Multi               | SER     | Continuous       | Discrete     | [Paper](https://arxiv.org/pdf/1908.08342.pdf)                                                                                        |
-| [PGMORL](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/pgmorl/pgmorl.py) <sup>[1](#f1)</sup>                                                     | Multi               | SER     | Continuous       | Continuous   | [Paper](https://people.csail.mit.edu/jiex/papers/PGMORL/paper.pdf) / [Supplementary Materials](https://people.csail.mit.edu/jiex/papers/PGMORL/supp.pdf)        |
-| [Pareto Conditioned Networks (PCN)](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/pcn/pcn.py)                                      | Multi               | SER/ESR <sup>[2](#f2)</sup>      | Continuous       | Discrete     | [Paper](https://www.ifaamas.org/Proceedings/aamas2022/pdfs/p1110.pdf)                                                          |
+| [PGMORL](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/pgmorl/pgmorl.py) *                                                     | Multi               | SER     | Continuous       | Continuous   | [Paper](https://people.csail.mit.edu/jiex/papers/PGMORL/paper.pdf) / [Supplementary materials](https://people.csail.mit.edu/jiex/papers/PGMORL/supp.pdf)        |
 | [Pareto Q-Learning](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/pareto_q_learning/pql.py)                                    | Multi               | SER     | Discrete         | Discrete     | [Paper](https://jmlr.org/papers/volume15/vanmoffaert14a/vanmoffaert14a.pdf)                                                          |
 | [MO Q learning](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/single_policy/ser/mo_q_learning.py)                                           | Single              | SER     | Discrete         | Discrete     | [Paper](https://www.researchgate.net/publication/235698665_Scalarized_Multi-Objective_Reinforcement_Learning_Novel_Design_Techniques)                                                                                                                             |
 | [MPMOQLearning](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/multi_policy_moqlearning/mp_mo_q_learning.py)  (outer loop MOQL) | Multi               | SER     | Discrete         | Discrete     | [Paper](https://www.researchgate.net/publication/235698665_Scalarized_Multi-Objective_Reinforcement_Learning_Novel_Design_Techniques) |
 | [Optimistic Linear Support (OLS)](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/multi_policy/ols/ols.py)                                    | Multi               | SER     | /                | /            | Section 3.3 of the [thesis](http://roijers.info/pub/thesis.pdf)     |
 | [Expected Utility Policy Gradient (EUPG)](https://github.com/LucasAlegre/morl-baselines/blob/main/morl_baselines/single_policy/esr/eupg.py)                          | Single              | ESR     | Discrete         | Discrete     |   [Paper](https://www.researchgate.net/publication/328718263_Multi-objective_Reinforcement_Learning_for_the_Expected_Utility_of_the_Return)                                                   |
 
-:warning: The algorithms have not been benchmarked yet, and some of them have limited features.
-
-<b id="f1">1</b>: Currently, PGMORL is limited to environments with 2 objectives.
-
-<b id="f2">2</b>: PCN assumes environments with deterministic transitions.
-
+:warning: The algorithms have not been benchmarked yet, and some of them have limited features. For example, PGMORL is limited to 2-objectives.
 <!-- end algos-list -->
-
-## Benchmarking
-
-<!-- start benchmark -->
-MORL-Baselines participates to [Open RL Benchmark](https://github.com/openrlbenchmark/openrlbenchmark) which contains tracked experiments from popular RL libraries such as [cleanRL](https://github.com/vwxyzjn/cleanrl) and [Stable Baselines 3](https://github.com/DLR-RM/stable-baselines3).
-
-We are currently running experiments of our algorithms on various environments from [MO-Gymnasium](https://www.github.com/Farama-Foundation/mo-gymnasium). The results can be found here: https://wandb.ai/openrlbenchmark/MORL-Baselines.
-<!-- end benchmark -->
 
 ## Structure
 

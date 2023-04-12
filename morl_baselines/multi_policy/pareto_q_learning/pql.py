@@ -1,16 +1,11 @@
 """Pareto Q-Learning."""
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
-import gymnasium as gym
 import numpy as np
 
 from morl_baselines.common.morl_algorithm import MOAgent
 from morl_baselines.common.pareto import get_non_dominated
 from morl_baselines.common.performance_indicators import hypervolume
-from morl_baselines.common.utils import (
-    linearly_decaying_value,
-    log_all_multi_policy_metrics,
-)
 
 
 class PQL(MOAgent):
@@ -26,12 +21,11 @@ class PQL(MOAgent):
         ref_point: np.ndarray,
         gamma: float = 0.8,
         initial_epsilon: float = 1.0,
-        epsilon_decay_steps: int = 100000,
+        epsilon_decay: float = 0.99,
         final_epsilon: float = 0.1,
-        seed: Optional[int] = None,
-        project_name: str = "MORL-Baselines",
+        seed: int = None,
+        project_name: str = "MORL-baselines",
         experiment_name: str = "Pareto Q-Learning",
-        wandb_entity: Optional[str] = None,
         log: bool = True,
     ):
         """Initialize the Pareto Q-learning algorithm.
@@ -41,23 +35,24 @@ class PQL(MOAgent):
             ref_point: The reference point for the hypervolume metric.
             gamma: The discount factor.
             initial_epsilon: The initial epsilon value.
-            epsilon_decay_steps: The number of steps to decay epsilon.
+            epsilon_decay: The epsilon decay rate.
             final_epsilon: The final epsilon value.
             seed: The random seed.
             project_name: The name of the project used for logging.
             experiment_name: The name of the experiment used for logging.
-            wandb_entity: The wandb entity used for logging.
             log: Whether to log or not.
         """
-        super().__init__(env, seed=seed)
+        super().__init__(env)
         # Learning parameters
         self.gamma = gamma
         self.epsilon = initial_epsilon
         self.initial_epsilon = initial_epsilon
-        self.epsilon_decay_steps = epsilon_decay_steps
+        self.epsilon_decay = epsilon_decay
         self.final_epsilon = final_epsilon
 
         # Algorithm setup
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.ref_point = ref_point
 
         self.num_actions = self.env.action_space.n
@@ -78,7 +73,7 @@ class PQL(MOAgent):
         self.log = log
 
         if self.log:
-            self.setup_wandb(project_name=self.project_name, experiment_name=self.experiment_name, entity=wandb_entity)
+            self.setup_wandb(project_name=self.project_name, experiment_name=self.experiment_name)
 
     def get_config(self) -> dict:
         """Get the configuration dictionary.
@@ -87,11 +82,10 @@ class PQL(MOAgent):
             Dict: A dictionary of parameters and values.
         """
         return {
-            "env_id": self.env.unwrapped.spec.id,
             "ref_point": list(self.ref_point),
             "gamma": self.gamma,
             "initial_epsilon": self.initial_epsilon,
-            "epsilon_decay_steps": self.epsilon_decay_steps,
+            "epsilon_decay": self.epsilon_decay,
             "final_epsilon": self.final_epsilon,
             "seed": self.seed,
         }
@@ -154,11 +148,11 @@ class PQL(MOAgent):
         Returns:
             int: The selected action.
         """
-        if self.np_random.uniform(0, 1) < self.epsilon:
-            return self.np_random.integers(self.num_actions)
+        if self.rng.uniform(0, 1) < self.epsilon:
+            return self.rng.integers(self.num_actions)
         else:
             action_scores = score_func(state)
-            return self.np_random.choice(np.argwhere(action_scores == np.max(action_scores)).flatten())
+            return self.rng.choice(np.argwhere(action_scores == np.max(action_scores)).flatten())
 
     def calc_non_dominated(self, state: int):
         """Get the non-dominated vectors in a given state.
@@ -174,22 +168,13 @@ class PQL(MOAgent):
         return non_dominated
 
     def train(
-        self,
-        total_timesteps: int,
-        eval_env: gym.Env,
-        ref_point: Optional[np.ndarray] = None,
-        known_pareto_front: Optional[List[np.ndarray]] = None,
-        log_every: Optional[int] = 10000,
-        action_eval: Optional[str] = "hypervolume",
+        self, num_episodes: Optional[int] = 3000, log_every: Optional[int] = 100, action_eval: Optional[str] = "hypervolume"
     ):
         """Learn the Pareto front.
 
         Args:
-            total_timesteps (int, optional): The number of episodes to train for.
-            eval_env (gym.Env): The environment to evaluate the policies on.
-            eval_ref_point (ndarray, optional): The reference point for the hypervolume metric during evaluation. If none, use the same ref point as training.
-            known_pareto_front (List[ndarray], optional): The optimal Pareto front, if known.
-            log_every (int, optional): Log the results every number of timesteps. (Default value = 1000)
+            num_episodes (int, optional): The number of episodes to train for.
+            log_every (int, optional): Log the results every number of episodes. (Default value = 100)
             action_eval (str, optional): The action evaluation function name. (Default value = 'hypervolume')
 
         Returns:
@@ -201,21 +186,19 @@ class PQL(MOAgent):
             score_func = self.score_pareto_cardinality
         else:
             raise Exception("No other method implemented yet")
-        if ref_point is None:
-            ref_point = self.ref_point
-        if self.log:
-            self.register_additional_config({"ref_point": ref_point.tolist(), "known_front": known_pareto_front})
 
-        while self.global_step < total_timesteps:
+        for episode in range(num_episodes):
+            if episode % log_every == 0:
+                print(f"Training episode {episode + 1}")
+
             state, _ = self.env.reset()
             state = int(np.ravel_multi_index(state, self.env_shape))
             terminated = False
             truncated = False
 
-            while not (terminated or truncated) and self.global_step < total_timesteps:
+            while not (terminated or truncated):
                 action = self.select_action(state, score_func)
                 next_state, reward, terminated, truncated, _ = self.env.step(action)
-                self.global_step += 1
                 next_state = int(np.ravel_multi_index(next_state, self.env_shape))
 
                 self.counts[state, action] += 1
@@ -223,81 +206,46 @@ class PQL(MOAgent):
                 self.avg_reward[state, action] += (reward - self.avg_reward[state, action]) / self.counts[state, action]
                 state = next_state
 
-                if self.log and self.global_step % log_every == 0:
-                    self.writer.add_scalar("global_step", self.global_step, self.global_step)
-                    pf = self._eval_all_policies(eval_env)
-                    log_all_multi_policy_metrics(
-                        current_front=pf,
-                        hv_ref_point=ref_point,
-                        reward_dim=self.reward_dim,
-                        global_step=self.global_step,
-                        writer=self.writer,
-                        ref_front=known_pareto_front,
-                    )
+            self.epsilon = max(self.final_epsilon, self.epsilon * self.epsilon_decay)
 
-            self.epsilon = linearly_decaying_value(
-                self.initial_epsilon,
-                self.epsilon_decay_steps,
-                self.global_step,
-                0,
-                self.final_epsilon,
-            )
+            if self.log and episode % log_every == 0:
+                pf = self.get_local_pcs(state=0)
+                value = hypervolume(self.ref_point, list(pf))
+                print(f"Hypervolume in episode {episode}: {value}")
+                self.writer.add_scalar("train/hypervolume", value, episode)
 
         return self.get_local_pcs(state=0)
 
-    def _eval_all_policies(self, env: gym.Env) -> List[np.ndarray]:
-        """Evaluate all learned policies by tracking them."""
-        pf = []
-        for vec in self.get_local_pcs(state=0):
-            pf.append(self.track_policy(vec, env))
-
-        return pf
-
-    def track_policy(self, vec, env: gym.Env, tol=1e-3):
+    def track_policy(self, vec):
         """Track a policy from its return vector.
 
         Args:
             vec (array_like): The return vector to track.
-            env (gym.Env): The environment to track the policy in.
-            tol (float, optional): The tolerance for the return vector. (Default value = 1e-3)
         """
         target = np.array(vec)
-        state, _ = env.reset()
+        state, _ = self.env.reset()
         terminated = False
         truncated = False
         total_rew = np.zeros(self.num_objectives)
-        current_gamma = 1.0
 
         while not (terminated or truncated):
             state = np.ravel_multi_index(state, self.env_shape)
-            closest_dist = np.inf
-            closest_action = 0
-            found_action = False
-            new_target = target
+            new_target = False
 
             for action in range(self.num_actions):
                 im_rew = self.avg_reward[state, action]
                 non_dominated_set = self.non_dominated[state][action]
-
                 for q in non_dominated_set:
                     q = np.array(q)
-                    dist = np.sum(np.abs(self.gamma * q + im_rew - target))
-                    if dist < closest_dist:
-                        closest_dist = dist
-                        closest_action = action
-                        new_target = q
+                    if np.all(self.gamma * q + im_rew == target):
+                        state, reward, terminated, truncated, _ = self.env.step(action)
+                        total_rew += reward
+                        target = q
+                        new_target = True
+                        break
 
-                        if dist < tol:
-                            found_action = True
-                            break
-
-                if found_action:
+                if new_target:
                     break
-
-            state, reward, terminated, truncated, _ = env.step(closest_action)
-            total_rew += current_gamma * reward
-            current_gamma *= self.gamma
-            target = new_target
 
         return total_rew
 

@@ -8,7 +8,6 @@ from typing import Callable, List
 import numpy as np
 import numpy.typing as npt
 from pymoo.indicators.hv import HV
-from pymoo.indicators.igd import IGD
 
 
 def hypervolume(ref_point: np.ndarray, points: List[npt.ArrayLike]) -> float:
@@ -22,20 +21,6 @@ def hypervolume(ref_point: np.ndarray, points: List[npt.ArrayLike]) -> float:
         float: Hypervolume metric
     """
     return HV(ref_point=ref_point * -1)(np.array(points) * -1)
-
-
-def igd(known_front: List[np.ndarray], current_estimate: List[np.ndarray]) -> float:
-    """Inverted generational distance metric. Requires to know the optimal front.
-
-    Args:
-        known_front: known pareto front for the problem
-        current_estimate: current pareto front
-
-    Return:
-        a float stating the average distance between a point in current_estimate and its nearest point in known_front
-    """
-    ind = IGD(np.array(known_front))
-    return ind(np.array(current_estimate))
 
 
 def sparsity(front: List[np.ndarray]) -> float:
@@ -64,7 +49,7 @@ def sparsity(front: List[np.ndarray]) -> float:
     return sparsity_value
 
 
-def expected_utility(front: List[np.ndarray], weights_set: List[np.ndarray], utility: Callable = np.dot) -> float:
+def expected_utility(front: List[np.ndarray], weights_set: np.ndarray, utility: Callable = np.dot) -> float:
     """Expected Utility Metric.
 
     Expected utility of the policies on the PF for various weights.
@@ -85,26 +70,3 @@ def expected_utility(front: List[np.ndarray], weights_set: List[np.ndarray], uti
         maxs.append(np.max(scalarized_front))
 
     return np.mean(np.array(maxs), axis=0)
-
-
-def maximum_utility_loss(
-    front: List[np.ndarray], reference_set: List[np.ndarray], weights_set: np.ndarray, utility: Callable = np.dot
-) -> float:
-    """Maximum Utility Loss Metric.
-
-    Maximum utility loss of the policies on the PF for various weights.
-    Paper: L. M. Zintgraf, T. V. Kanters, D. M. Roijers, F. A. Oliehoek, and P. Beau, “Quality Assessment of MORL Algorithms: A Utility-Based Approach,” 2015.
-
-    Args:
-        front: current pareto front to compute the mul on
-        reference_set: reference set (e.g. true Pareto front) to compute the mul on
-        weights_set: weights to use for the utility computation
-        utility: utility function to use (default: dot product)
-
-    Returns:
-        float: mul metric
-    """
-    max_scalarized_values_ref = [np.max([utility(weight, point) for point in reference_set]) for weight in weights_set]
-    max_scalarized_values = [np.max([utility(weight, point) for point in front]) for weight in weights_set]
-    utility_losses = [max_scalarized_values_ref[i] - max_scalarized_values[i] for i in range(len(max_scalarized_values))]
-    return np.max(utility_losses)
